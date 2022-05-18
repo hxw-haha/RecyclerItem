@@ -1,5 +1,6 @@
 package com.hxw.recycler.recycler_lib;
 
+import android.animation.Animator;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.util.SparseArray;
@@ -17,7 +18,6 @@ import androidx.recyclerview.widget.RecyclerView.LayoutManager;
 import androidx.recyclerview.widget.StaggeredGridLayoutManager;
 
 import com.hxw.recycler.recycler_lib.empty.EmptyView;
-import com.hxw.recycler.recycler_lib.empty.SimpleEmptyView;
 import com.hxw.recycler.recycler_lib.listener.OnDebounceClickListener;
 import com.hxw.recycler.recycler_lib.loadmore.LoadMoreView;
 
@@ -50,6 +50,8 @@ public class RecyclerAdapter extends Adapter<RecyclerHolder> {
 
     public static final int BASE_ITEM_TYPE_EMPTY = 0x40000000;
     private EmptyBuilder emptyBuilder = new EmptyBuilder();
+
+    private AnimationBuilder animationBuilder = new AnimationBuilder();
 
     public RecyclerAdapter(@NonNull Context context) {
         inflater = LayoutInflater.from(context);
@@ -186,6 +188,7 @@ public class RecyclerAdapter extends Adapter<RecyclerHolder> {
         dataSets.clear();
         dataSets.addAll(dataItems);
         setEmptyStatus(dataItems.size() > 0 ? EmptyView.STATUS_DEFAULT : EmptyView.STATUS_EMPTY);
+        animationBuilder.setLastPosition(-1);
         notifyDataSetChanged();
     }
 
@@ -434,8 +437,28 @@ public class RecyclerAdapter extends Adapter<RecyclerHolder> {
                     ((StaggeredGridLayoutManager.LayoutParams) lp).setFullSpan(true);
                 }
             }
-
+            addAnimation(holder);
             dataItem.onViewAttachedToWindow(holder);
+        }
+    }
+
+    /**
+     * add animation when you want to show time
+     *
+     * @param holder
+     */
+    private void addAnimation(@NonNull RecyclerView.ViewHolder holder) {
+        if (!animationBuilder.isOpenAnimationEnable()) {
+            return;
+        }
+        if (!animationBuilder.isFirstOnlyEnable()
+                || holder.getLayoutPosition() > animationBuilder.getLastPosition()) {
+            for (Animator anim : animationBuilder.getItemAnimation()
+                    .getAnimators(holder.itemView)) {
+                anim.setDuration(animationBuilder.getDuration()).start();
+                anim.setInterpolator(animationBuilder.getInterpolator());
+            }
+            animationBuilder.setLastPosition(holder.getLayoutPosition());
         }
     }
 
