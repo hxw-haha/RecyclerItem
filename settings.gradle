@@ -1,0 +1,3 @@
+rootProject.name = "Recycler Item"
+include ':app'
+include ':recycler_lib'
