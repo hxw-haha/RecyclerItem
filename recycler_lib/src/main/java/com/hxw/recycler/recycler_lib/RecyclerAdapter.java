@@ -25,6 +25,7 @@ import java.lang.ref.WeakReference;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -59,7 +60,7 @@ public class RecyclerAdapter extends Adapter<RecyclerHolder> {
 
     @NonNull
     public List<RecyclerDataItem<?, RecyclerHolder>> getDataSets() {
-        return dataSets;
+        return Collections.unmodifiableList(dataSets);
     }
 
     public void addHeaderView(@NonNull View view) {
@@ -515,8 +516,12 @@ public class RecyclerAdapter extends Adapter<RecyclerHolder> {
         this.loadMoreBuilder = loadMoreBuilder;
     }
 
-    public void setEmptyBuilder(EmptyBuilder emptyBuilder) {
+    public void setEmptyBuilder(@NonNull EmptyBuilder emptyBuilder) {
         this.emptyBuilder = emptyBuilder;
+    }
+
+    public void setAnimationBuilder(@NonNull AnimationBuilder animationBuilder) {
+        this.animationBuilder = animationBuilder;
     }
 
     /**
