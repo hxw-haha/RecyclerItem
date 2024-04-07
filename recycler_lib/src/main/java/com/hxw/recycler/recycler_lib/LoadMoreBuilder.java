@@ -3,9 +3,10 @@ package com.hxw.recycler.recycler_lib;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.hxw.recycler.recycler_lib.loadmore.LoadMoreView;
 import com.hxw.recycler.recycler_lib.listener.RequestLoadMoreListener;
-import com.hxw.recycler.recycler_lib.loadmore.SimpleLoadMoreView;
+import com.hxw.recycler.recycler_lib.loadmore.LoadMoreDelegate;
+import com.hxw.recycler.recycler_lib.loadmore.LoadMoreDownView;
+import com.hxw.recycler.recycler_lib.loadmore.LoadMoreView;
 
 /**
  * <p>文件描述：</p>
@@ -16,19 +17,44 @@ import com.hxw.recycler.recycler_lib.loadmore.SimpleLoadMoreView;
  */
 public class LoadMoreBuilder {
 
-    private LoadMoreView loadMoreView = new SimpleLoadMoreView();
+    private LoadMoreDelegate loadMoreDelegate = new LoadMoreView();
     private RequestLoadMoreListener requestLoadMoreListener;
     private boolean nextLoadEnable = false;
     private boolean loadMoreEnable = false;
     private boolean loading = false;
     private boolean enableLoadMoreEndClick = false;
     private int preLoadNumber = 3;
+    private boolean pullDownLoading = false;
 
+    /**
+     * 开启上拉加载更多
+     *
+     * @param requestLoadMoreListener
+     * @return
+     */
     public LoadMoreBuilder openLoadMore(@NonNull RequestLoadMoreListener requestLoadMoreListener) {
+        this.loadMoreDelegate = new LoadMoreView();
         this.requestLoadMoreListener = requestLoadMoreListener;
         this.nextLoadEnable = true;
         this.loadMoreEnable = true;
         this.loading = false;
+        this.pullDownLoading = false;
+        return this;
+    }
+
+    /**
+     * 开启下拉加载更多
+     *
+     * @param requestLoadMoreListener
+     * @return
+     */
+    public LoadMoreBuilder openDownLoadMore(@NonNull RequestLoadMoreListener requestLoadMoreListener) {
+        this.loadMoreDelegate = new LoadMoreDownView();
+        this.requestLoadMoreListener = requestLoadMoreListener;
+        this.nextLoadEnable = true;
+        this.loadMoreEnable = false;
+        this.loading = false;
+        this.pullDownLoading = true;
         return this;
     }
 
@@ -39,11 +65,6 @@ public class LoadMoreBuilder {
 
     public LoadMoreBuilder setNextLoadEnable(boolean nextLoadEnable) {
         this.nextLoadEnable = nextLoadEnable;
-        return this;
-    }
-
-    public LoadMoreBuilder setLoadMoreEnable(boolean loadMoreEnable) {
-        this.loadMoreEnable = loadMoreEnable;
         return this;
     }
 
@@ -62,14 +83,14 @@ public class LoadMoreBuilder {
         return this;
     }
 
-    public LoadMoreBuilder setLoadMoreView(@NonNull LoadMoreView loadMoreView) {
-        this.loadMoreView = loadMoreView;
+    public LoadMoreBuilder setLoadMoreView(@NonNull LoadMoreDelegate loadMoreDelegate) {
+        this.loadMoreDelegate = loadMoreDelegate;
         return this;
     }
 
     @NonNull
-    public LoadMoreView getLoadMoreView() {
-        return loadMoreView;
+    public LoadMoreDelegate getLoadMoreView() {
+        return loadMoreDelegate;
     }
 
     @Nullable
@@ -97,4 +118,7 @@ public class LoadMoreBuilder {
         return preLoadNumber;
     }
 
+    public boolean isPullDownLoading() {
+        return pullDownLoading;
+    }
 }

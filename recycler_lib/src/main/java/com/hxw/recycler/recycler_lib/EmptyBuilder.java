@@ -29,6 +29,7 @@ public class EmptyBuilder {
 
     public EmptyBuilder setEmptyView(@NonNull EmptyView emptyView) {
         this.emptyView = emptyView;
+        setEmptyStatus(EmptyView.STATUS_LOADING);
         return this;
     }
 

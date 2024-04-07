@@ -13,9 +13,9 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-import androidx.recyclerview.widget.RecyclerView.Adapter;
 import androidx.recyclerview.widget.RecyclerView.LayoutManager;
 import androidx.recyclerview.widget.StaggeredGridLayoutManager;
+
 
 import com.hxw.recycler.recycler_lib.empty.EmptyView;
 import com.hxw.recycler.recycler_lib.listener.OnDebounceClickListener;
@@ -35,7 +35,7 @@ import java.util.List;
  * <p>更改时间：2022/5/7</p>
  * <p>版本号：1</p>
  */
-public class RecyclerAdapter extends Adapter<RecyclerHolder> {
+public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerHolder> {
     private final LayoutInflater inflater;
     private WeakReference<RecyclerView> recyclerViewRef = null;
     private final List<RecyclerDataItem<?, RecyclerHolder>> dataSets = new ArrayList<>();
@@ -51,6 +51,8 @@ public class RecyclerAdapter extends Adapter<RecyclerHolder> {
 
     public static final int BASE_ITEM_TYPE_EMPTY = 0x40000000;
     private EmptyBuilder emptyBuilder = new EmptyBuilder();
+
+    public static final int BASE_ITEM_TYPE_DEFAULT = 0x50000000;
 
     private AnimationBuilder animationBuilder = new AnimationBuilder();
 
@@ -124,7 +126,7 @@ public class RecyclerAdapter extends Adapter<RecyclerHolder> {
 
         int notifyPos = index >= 0 ? index : dataSets.size() - 1;
         if (notify) {
-            notifyItemInserted(notifyPos);
+            notifyItemInserted(getHeaderSize() + notifyPos);
         }
         dataItem.setAdapter(this);
     }
@@ -140,7 +142,7 @@ public class RecyclerAdapter extends Adapter<RecyclerHolder> {
             dataItem.setAdapter(this);
         }
         if (notify) {
-            notifyItemRangeInserted(start, items.size());
+            notifyItemRangeInserted(getHeaderSize() + start, items.size());
         }
     }
 
@@ -151,7 +153,7 @@ public class RecyclerAdapter extends Adapter<RecyclerHolder> {
     public RecyclerDataItem<?, RecyclerHolder> removeItemAt(int index) {
         if (index >= 0 && index < dataSets.size()) {
             RecyclerDataItem<?, RecyclerHolder> remove = dataSets.remove(index);
-            notifyItemRemoved(index);
+            notifyItemRemoved(getHeaderSize() + index);
 
             if (dataSets.size() == 0) {
                 setEmptyStatus(EmptyView.STATUS_EMPTY);
@@ -176,7 +178,7 @@ public class RecyclerAdapter extends Adapter<RecyclerHolder> {
      */
     public void refreshItem(@NonNull RecyclerDataItem<?, RecyclerHolder> dataItem) {
         int indexOf = dataSets.indexOf(dataItem);
-        notifyItemChanged(indexOf);
+        notifyItemChanged(getHeaderSize() + indexOf);
     }
 
     /**
@@ -187,9 +189,14 @@ public class RecyclerAdapter extends Adapter<RecyclerHolder> {
     @SuppressLint("NotifyDataSetChanged")
     public void refreshAll(@NonNull List<RecyclerDataItem<?, RecyclerHolder>> dataItems) {
         dataSets.clear();
-        dataSets.addAll(dataItems);
         setEmptyStatus(dataItems.size() > 0 ? EmptyView.STATUS_DEFAULT : EmptyView.STATUS_EMPTY);
+        for (RecyclerDataItem<?, RecyclerHolder> dataItem : dataItems) {
+            dataSets.add(dataItem);
+            dataItem.setAdapter(this);
+        }
         animationBuilder.setLastPosition(-1);
+        loadMoreBuilder.getLoadMoreView().setLoadMoreEndGone(false);
+        loadMoreBuilder.setNextLoadEnable(true);
         notifyDataSetChanged();
     }
 
@@ -216,10 +223,14 @@ public class RecyclerAdapter extends Adapter<RecyclerHolder> {
             return footers.keyAt(footerPosition);
         }
         int itemPosition = position - getHeaderSize();
-        RecyclerDataItem<?, RecyclerHolder> dataItem = dataSets.get(itemPosition);
-        int type = dataItem.getClass().hashCode();
-        typePositions.put(type, itemPosition);
-        return type;
+        if (itemPosition >= 0 && itemPosition < getOriginalItemSize()) {
+            RecyclerDataItem<?, RecyclerHolder> dataItem = dataSets.get(itemPosition);
+            int type = dataItem.getClass().hashCode();
+            typePositions.put(type, itemPosition);
+            return type;
+        }
+        // 如果计算出的 itemPosition 不在有效范围内，返回一个默认值
+        return BASE_ITEM_TYPE_DEFAULT;
     }
 
     private RecyclerHolder getLoadingView(@NonNull ViewGroup parent) {
@@ -252,13 +263,19 @@ public class RecyclerAdapter extends Adapter<RecyclerHolder> {
         emptyBuilder.getEmptyView().getEmptyView(emptyHolder).setOnClickListener(new OnDebounceClickListener() {
             @Override
             protected void onDebounceClick(@NonNull View view) {
-                setEmptyStatus(EmptyView.STATUS_LOADING);
                 if (emptyBuilder.getEmptyListener() != null) {
+                    setEmptyStatus(EmptyView.STATUS_LOADING);
                     emptyBuilder.getEmptyListener().onEmptyRequested();
                 }
             }
         });
         return emptyHolder;
+    }
+
+    private RecyclerHolder getItemDefaultView(@NonNull ViewGroup parent) {
+        View view = inflater.inflate(R.layout.layout_item_default, parent, false);
+        return new RecyclerHolder(view) {
+        };
     }
 
     @NonNull
@@ -279,6 +296,10 @@ public class RecyclerAdapter extends Adapter<RecyclerHolder> {
             View view = footers.get(viewType);
             return new RecyclerHolder(view) {
             };
+        }
+        if (viewType == BASE_ITEM_TYPE_DEFAULT) {
+            // 处理默认类型
+            return getItemDefaultView(parent);
         }
         int position = typePositions.get(viewType);
         RecyclerDataItem<?, RecyclerHolder> dataItem = dataSets.get(position);
@@ -304,17 +325,20 @@ public class RecyclerAdapter extends Adapter<RecyclerHolder> {
         }
         autoLoadMore(position);
         if (position == getItemTotalCount()) {
-            loadMoreBuilder.getLoadMoreView().convert();
+            loadMoreConvert();
             return;
         }
-        if (isHeaderPosition(position)
-                || isFooterPosition(position)) {
+        if (isHeaderPosition(position) || isFooterPosition(position)) {
             return;
         }
         int itemPosition = position - getHeaderSize();
-        RecyclerDataItem<?, RecyclerHolder> dataItem = getItem(itemPosition);
-        if (dataItem != null) {
-            dataItem.onBindData(holder, itemPosition);
+        if (itemPosition >= 0 && itemPosition < getOriginalItemSize()) {
+            RecyclerDataItem<?, RecyclerHolder> dataItem = getItem(itemPosition);
+            if (dataItem != null) {
+                dataItem.onBindData(holder, itemPosition);
+            }
+        } else if (holder.getItemViewType() == BASE_ITEM_TYPE_DEFAULT) {
+            // 处理默认类型的逻辑
         }
     }
 
@@ -394,6 +418,7 @@ public class RecyclerAdapter extends Adapter<RecyclerHolder> {
         super.onDetachedFromRecyclerView(recyclerView);
         if (recyclerViewRef != null) {
             recyclerViewRef.clear();
+            recyclerViewRef = null;
         }
     }
 
@@ -423,23 +448,26 @@ public class RecyclerAdapter extends Adapter<RecyclerHolder> {
             boolean isHeaderFooter = isHeaderPosition(position) || isFooterPosition(position);
             int itemPosition = position - getHeaderSize();
             RecyclerDataItem<?, RecyclerHolder> dataItem = getItem(itemPosition);
-            if (dataItem == null) {
-                return;
-            }
             ViewGroup.LayoutParams lp = holder.itemView.getLayoutParams();
             if (lp instanceof StaggeredGridLayoutManager.LayoutParams) {
                 StaggeredGridLayoutManager manager = (StaggeredGridLayoutManager) recyclerView.getLayoutManager();
-                if (isHeaderFooter) {
+                if (holder.getItemViewType() == BASE_ITEM_TYPE_EMPTY
+                        || holder.getItemViewType() == BASE_ITEM_TYPE_LOADING
+                        || isHeaderFooter) {
                     ((StaggeredGridLayoutManager.LayoutParams) lp).setFullSpan(true);
                     return;
                 }
-                int spanSize = dataItem.getSpanSize();
-                if (manager != null && spanSize == manager.getSpanCount()) {
-                    ((StaggeredGridLayoutManager.LayoutParams) lp).setFullSpan(true);
+                if (dataItem != null) {
+                    int spanSize = dataItem.getSpanSize();
+                    if (manager != null && (spanSize >= manager.getSpanCount() || spanSize <= 0)) {
+                        ((StaggeredGridLayoutManager.LayoutParams) lp).setFullSpan(true);
+                    }
                 }
             }
             addAnimation(holder);
-            dataItem.onViewAttachedToWindow(holder);
+            if (dataItem != null) {
+                dataItem.onViewAttachedToWindow(holder);
+            }
         }
     }
 
@@ -467,7 +495,7 @@ public class RecyclerAdapter extends Adapter<RecyclerHolder> {
     @Override
     public void onViewDetachedFromWindow(@NonNull RecyclerHolder holder) {
         super.onViewDetachedFromWindow(holder);
-        int position = holder.getAdapterPosition();
+        int position = holder.getBindingAdapterPosition();
         if (isHeaderPosition(position) || isFooterPosition(position)) {
             return;
         }
@@ -559,15 +587,15 @@ public class RecyclerAdapter extends Adapter<RecyclerHolder> {
      * The notification starts the callback and loads more
      */
     public void notifyLoadMoreToLoading() {
-        if (loadMoreBuilder.getLoadMoreView().getLoadMoreStatus() == LoadMoreView.STATUS_LOADING) {
+        if (loadMoreBuilder.getLoadMoreView().getLoadMoreStatus() == LoadMoreView.STATUS_LOADING
+                || loadMoreBuilder.getLoadMoreView().getLoadMoreStatus() == LoadMoreView.STATUS_END) {
             return;
         }
         loadMoreBuilder.getLoadMoreView().setLoadMoreStatus(LoadMoreView.STATUS_LOADING);
-        loadMoreBuilder.getLoadMoreView().convert();
         if (loadMoreBuilder.getRequestLoadMoreListener() != null) {
             loadMoreBuilder.getRequestLoadMoreListener().onLoadMoreRequested();
         }
-        notifyItemChanged(getItemCount());
+        loadMoreConvert();
     }
 
     /**
@@ -582,11 +610,11 @@ public class RecyclerAdapter extends Adapter<RecyclerHolder> {
         loadMoreBuilder.setNextLoadEnable(false);
         loadMoreBuilder.getLoadMoreView().setLoadMoreEndGone(gone);
         if (gone) {
-            notifyItemRemoved(getItemCount());
+            loadMoreBuilder.getLoadMoreView().setLoadMoreStatus(LoadMoreView.STATUS_DEFAULT);
         } else {
             loadMoreBuilder.getLoadMoreView().setLoadMoreStatus(LoadMoreView.STATUS_END);
-            notifyItemChanged(getItemCount());
         }
+        loadMoreConvert();
     }
 
     /**
@@ -600,7 +628,7 @@ public class RecyclerAdapter extends Adapter<RecyclerHolder> {
         loadMoreBuilder.setLoading(false);
         loadMoreBuilder.setNextLoadEnable(true);
         loadMoreBuilder.getLoadMoreView().setLoadMoreStatus(LoadMoreView.STATUS_DEFAULT);
-        notifyItemChanged(getItemCount());
+        loadMoreConvert();
     }
 
     /**
@@ -613,33 +641,29 @@ public class RecyclerAdapter extends Adapter<RecyclerHolder> {
         setEmptyStatus(EmptyView.STATUS_DEFAULT);
         loadMoreBuilder.setLoading(false);
         loadMoreBuilder.getLoadMoreView().setLoadMoreStatus(LoadMoreView.STATUS_FAIL);
+        loadMoreConvert();
+    }
+
+    private void loadMoreConvert() {
+        if (loadMoreBuilder.getLoadMoreView().isHolderEmpty()) {
+            final RecyclerView attachRecyclerView = getAttachRecyclerView();
+            if (attachRecyclerView != null) {
+                onCreateViewHolder(attachRecyclerView, BASE_ITEM_TYPE_LOADING);
+            }
+        }
         loadMoreBuilder.getLoadMoreView().convert();
-        notifyItemChanged(getItemCount());
     }
 
     public void setEmptyStatus(int emptyStatus) {
-        emptyBuilder.setEmptyStatus(emptyStatus);
-    }
-
-    /**
-     * Set the enabled state of load more.
-     *
-     * @param enable True if load more is enabled, false otherwise.
-     */
-    public void setEnableLoadMore(boolean enable) {
-        int oldLoadMoreCount = getLoadMoreViewCount();
-        loadMoreBuilder.setLoadMoreEnable(enable);
-        int newLoadMoreCount = getLoadMoreViewCount();
-
-        if (oldLoadMoreCount == 1) {
-            if (newLoadMoreCount == 0) {
-                notifyItemRemoved(getItemTotalCount());
+        if (emptyStatus == EmptyView.STATUS_EMPTY) {
+            if (getDataSets().size() == 0) {
+                emptyBuilder.setEmptyStatus(EmptyView.STATUS_EMPTY);
+            } else {
+                emptyBuilder.setEmptyStatus(EmptyView.STATUS_DEFAULT);
             }
         } else {
-            if (newLoadMoreCount == 1) {
-                loadMoreBuilder.getLoadMoreView().setLoadMoreStatus(LoadMoreView.STATUS_DEFAULT);
-                notifyItemInserted(getItemTotalCount());
-            }
+            emptyBuilder.setEmptyStatus(emptyStatus);
         }
     }
+
 }

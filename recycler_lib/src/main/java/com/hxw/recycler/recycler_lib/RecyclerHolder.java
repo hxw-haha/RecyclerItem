@@ -32,4 +32,10 @@ public class RecyclerHolder extends RecyclerView.ViewHolder {
     public ViewDataBinding getDataBinding() {
         return dataBinding;
     }
+
+    public void bindData(int variableId, @Nullable Object value) {
+        if (dataBinding != null) {
+            dataBinding.setVariable(variableId, value);
+        }
+    }
 }

@@ -2,43 +2,54 @@ package com.hxw.recycler.recycler_lib.loadmore;
 
 import android.view.View;
 
-import androidx.annotation.CallSuper;
-import androidx.annotation.LayoutRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.hxw.recycler.recycler_lib.RecyclerDataItem;
+import com.hxw.recycler.recycler_lib.R;
 import com.hxw.recycler.recycler_lib.RecyclerHolder;
+import com.hxw.recycler.recycler_lib.databinding.LayoutLoadMoreSimpleBinding;
 
-public abstract class LoadMoreView {
 
-    public static final int STATUS_DEFAULT = 11;
-    public static final int STATUS_LOADING = 12;
-    public static final int STATUS_FAIL = 13;
-    public static final int STATUS_END = 14;
+public class LoadMoreView extends LoadMoreDelegate {
 
-    private int mLoadMoreStatus = STATUS_DEFAULT;
-    private boolean mLoadMoreEndGone = false;
-
-    private RecyclerHolder holder;
-
-    public void setHolder(@NonNull RecyclerHolder holder) {
-        this.holder = holder;
+    @Override
+    public int getItemLayoutRes() {
+        return R.layout.layout_load_more_simple;
     }
 
-    public void setLoadMoreStatus(int loadMoreStatus) {
-        this.mLoadMoreStatus = loadMoreStatus;
+    @NonNull
+    @Override
+    protected View getLoadingView(@NonNull RecyclerHolder holder) {
+        if (holder.getDataBinding() instanceof LayoutLoadMoreSimpleBinding) {
+            return ((LayoutLoadMoreSimpleBinding) holder.getDataBinding()).loadMoreLoadingView;
+        }
+        throw new RuntimeException("SimpleLoadMoreView RuntimeException");
     }
 
-    public int getLoadMoreStatus() {
-        return mLoadMoreStatus;
+    @Nullable
+    @Override
+    protected View getLoadFailView(@NonNull RecyclerHolder holder) {
+        if (holder.getDataBinding() instanceof LayoutLoadMoreSimpleBinding) {
+            return ((LayoutLoadMoreSimpleBinding) holder.getDataBinding()).loadMoreLoadFailView;
+        }
+        return null;
     }
 
+    @Nullable
+    @Override
+    protected View getLoadEndView(@NonNull RecyclerHolder holder) {
+        if (holder.getDataBinding() instanceof LayoutLoadMoreSimpleBinding) {
+            return ((LayoutLoadMoreSimpleBinding) holder.getDataBinding()).loadMoreLoadEndView;
+        }
+        return null;
+    }
+
+    @Override
     public void convert() {
-        if (holder == null) {
+        if (getHolder() == null) {
             return;
         }
-        switch (mLoadMoreStatus) {
+        switch (getLoadMoreStatus()) {
             case STATUS_LOADING:
                 visibleLoading(true);
                 visibleLoadFail(false);
@@ -65,60 +76,32 @@ public abstract class LoadMoreView {
     }
 
     private void visibleLoading(boolean visible) {
-        getLoadingView(holder).setVisibility(visible ? View.VISIBLE : View.GONE);
+        if (getHolder() == null) {
+            return;
+        }
+        final View loadingView = getLoadingView(getHolder());
+        loadingView.post(() -> loadingView.setVisibility(visible ? View.VISIBLE : View.GONE));
     }
 
     private void visibleLoadFail(boolean visible) {
-        getLoadFailView(holder).setVisibility(visible ? View.VISIBLE : View.GONE);
+        if (getHolder() == null) {
+            return;
+        }
+        final View loadFailView = getLoadFailView(getHolder());
+        if (loadFailView != null) {
+            loadFailView.post(() -> loadFailView.setVisibility(visible ? View.VISIBLE : View.GONE));
+        }
     }
 
     private void visibleLoadEnd(boolean visible) {
-        final View loadEndView = getLoadEndView(holder);
+        if (getHolder() == null) {
+            return;
+        }
+        final View loadEndView = getLoadEndView(getHolder());
         if (loadEndView != null) {
-            loadEndView.setVisibility(visible ? View.VISIBLE : View.GONE);
+            loadEndView.post(() -> loadEndView.setVisibility(visible ? View.VISIBLE : View.GONE));
         }
     }
 
-    public final void setLoadMoreEndGone(boolean loadMoreEndGone) {
-        this.mLoadMoreEndGone = loadMoreEndGone;
-    }
-
-    public final boolean isLoadEndMoreGone() {
-        if (holder == null || getLoadEndView(holder) == null) {
-            return true;
-        }
-        return mLoadMoreEndGone;
-    }
-
-    public abstract
-    @LayoutRes
-    int getItemLayoutRes();
-
-
-    /**
-     * loading view
-     *
-     * @return
-     */
-    @NonNull
-    protected abstract View getLoadingView(@NonNull RecyclerHolder holder);
-
-    /**
-     * load fail view
-     *
-     * @return
-     */
-    @NonNull
-    protected abstract View getLoadFailView(@NonNull RecyclerHolder holder);
-
-    /**
-     * load end view, you can return 0
-     *
-     * @return
-     */
-    @Nullable
-    protected View getLoadEndView(@NonNull RecyclerHolder holder) {
-        return null;
-    }
 
 }

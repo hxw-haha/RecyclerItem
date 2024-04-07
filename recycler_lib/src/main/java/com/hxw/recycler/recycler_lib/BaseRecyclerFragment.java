@@ -92,7 +92,6 @@ public abstract class BaseRecyclerFragment extends Fragment
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        getLoadMoreBuilder().setLoadMoreEnable(isLoadMoreEnable());
         if (isLoadMoreEnable()) {
             getLoadMoreBuilder().openLoadMore(this);
         }
@@ -124,6 +123,7 @@ public abstract class BaseRecyclerFragment extends Fragment
             case EMPTY_SUCCESS:
                 if (isNonEmpty) {
                     getAdapter().refreshAll(items);
+                    getAdapter().loadMoreComplete();
                 }
                 break;
             case LOAD_MORE_COMPLETE:

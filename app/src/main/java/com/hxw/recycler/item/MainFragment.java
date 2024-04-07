@@ -71,7 +71,7 @@ public class MainFragment extends BaseRecyclerFragment {
 
     private List<RecyclerDataItem<?, RecyclerHolder>> create9Item() {
         List<RecyclerDataItem<?, RecyclerHolder>> items = new ArrayList<>();
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < 2; i++) {
             items.add(new DataItem1(""));
             items.add(new DataItem2(""));
             items.add(new DataItem3(""));
